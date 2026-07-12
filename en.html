@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI vs Bitcoin — Live Energy Tracker</title>
+<meta name="description" content="The first tracker overlaying, in real time, the electricity consumption of global AI and the Bitcoin network.">
+<style>
+:root{
+  --bg:#0A0F1E; --panel:#0F1628; --grid:#1B2436; --line:#232E45;
+  --txt:#E8EDF7; --muted:#8B96AD; --dim:#5A6478;
+  --btc:#F7931A; --btc-soft:rgba(247,147,26,.14);
+  --ai:#4DA3FF; --ai-soft:rgba(77,163,255,.13);
+  --live:#3DDC84; --warn:#FFB84D;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;line-height:1.55;-webkit-font-smoothing:antialiased}
+.mono{font-family:'IBM Plex Mono','SF Mono',Menlo,Consolas,monospace}
+.wrap{max-width:1060px;margin:0 auto;padding:0 20px}
+
+/* ── Header ── */
+header{border-bottom:1px solid var(--line);padding:14px 0}
+.hrow{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.18em;color:var(--muted);text-transform:uppercase}
+.live-pill{display:inline-flex;align-items:center;gap:7px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;color:var(--live);border:1px solid rgba(61,220,132,.35);border-radius:999px;padding:4px 12px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--live);animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(61,220,132,.5)}50%{opacity:.6;box-shadow:0 0 0 6px rgba(61,220,132,0)}}
+@media (prefers-reduced-motion:reduce){.live-dot{animation:none}}
+
+/* ── Hero ── */
+.hero{padding:52px 0 8px}
+h1{font-size:clamp(30px,5vw,52px);font-weight:800;letter-spacing:-.02em;line-height:1.08}
+h1 .btc-c{color:var(--btc)} h1 .ai-c{color:var(--ai)}
+.sub{color:var(--muted);max-width:640px;margin-top:14px;font-size:15px}
+
+/* ── Live gauges ── */
+.gauges{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:34px 0 10px}
+@media(max-width:720px){.gauges{grid-template-columns:1fr}}
+.gauge{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 24px;position:relative;overflow:hidden}
+.gauge::before{content:"";position:absolute;top:0;left:0;right:0;height:3px}
+.g-btc::before{background:var(--btc)} .g-ai::before{background:var(--ai)}
+.g-label{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+.g-tag{font-size:10px;padding:2px 8px;border-radius:4px;letter-spacing:.08em}
+.g-btc .g-tag{color:var(--live);border:1px solid rgba(61,220,132,.35)}
+.g-ai .g-tag{color:var(--warn);border:1px solid rgba(255,184,77,.35)}
+.g-value{font-family:'IBM Plex Mono',monospace;font-size:clamp(34px,4.6vw,46px);font-weight:600;margin-top:10px;font-variant-numeric:tabular-nums}
+.g-btc .g-value{color:var(--btc)} .g-ai .g-value{color:var(--ai)}
+.g-unit{font-size:16px;color:var(--dim);font-weight:400}
+.g-sub{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);margin-top:8px;font-variant-numeric:tabular-nums}
+.g-foot{font-size:12px;color:var(--dim);margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+
+/* Signature: session counter */
+.session{background:linear-gradient(90deg,rgba(247,147,26,.06),rgba(77,163,255,.06));border:1px solid var(--line);border-radius:14px;padding:16px 24px;display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:44px}
+.session .s-l{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.session .s-v{font-family:'IBM Plex Mono',monospace;font-size:20px;font-variant-numeric:tabular-nums}
+.session .s-v b{font-weight:600}
+
+/* ── Chart ── */
+.chart-head{display:flex;justify-content:space-between;align-items:end;gap:14px;flex-wrap:wrap;margin-bottom:10px}
+h2{font-size:22px;font-weight:700;letter-spacing:-.01em}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.sw{width:18px;height:3px;border-radius:2px;display:inline-block}
+.sw.b{background:var(--btc)} .sw.a{background:var(--ai)}
+.sw.dash{background:repeating-linear-gradient(90deg,var(--dim) 0 5px,transparent 5px 9px)}
+.chart-box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 8px 8px;margin-bottom:12px}
+svg text{font-family:'IBM Plex Mono',monospace}
+.tooltip{position:fixed;pointer-events:none;background:#141C31;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-family:'IBM Plex Mono',monospace;font-size:12px;display:none;z-index:10;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.tooltip .t-y{color:var(--muted);margin-bottom:4px}
+.tooltip .t-b{color:var(--btc)} .tooltip .t-a{color:var(--ai)}
+.chart-note{font-size:12px;color:var(--dim);margin-bottom:52px}
+
+/* ── Method ── */
+.method{padding:8px 0 30px}
+.m-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px}
+@media(max-width:720px){.m-grid{grid-template-columns:1fr}}
+.m-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 24px}
+.m-card h3{font-size:14px;font-family:'IBM Plex Mono',monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px}
+.m-card.m-b h3{color:var(--btc)} .m-card.m-a h3{color:var(--ai)}
+.m-card p{font-size:13.5px;color:var(--muted);margin-bottom:10px}
+.m-card .formula{font-family:'IBM Plex Mono',monospace;font-size:12.5px;background:#0A101F;border:1px solid var(--line);border-radius:8px;padding:12px 14px;color:var(--txt);margin:12px 0;overflow-x:auto;white-space:nowrap}
+.conf{font-size:11px;font-family:'IBM Plex Mono',monospace;letter-spacing:.08em}
+.conf.hi{color:var(--live)} .conf.med{color:var(--warn)}
+
+/* ── Sources ── */
+.sources{border-top:1px solid var(--line);padding:26px 0 46px;margin-top:20px}
+.sources h3{font-size:12px;font-family:'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+.sources ul{list-style:none;font-size:13px;color:var(--muted)}
+.sources li{margin-bottom:6px}
+.sources a{color:var(--ai);text-decoration:none}
+.sources a:hover{text-decoration:underline}
+.stamp{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim);margin-top:18px}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<header><div class="wrap hrow">
+  <div class="brand">Energy Race Tracker</div>
+  <a href="index.html" style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;color:#8B96AD;text-decoration:none;border:1px solid #232E45;border-radius:999px;padding:4px 12px">FR</a>
+  <div class="live-pill"><span class="live-dot"></span><span id="liveStatus">CONNECTING TO BITCOIN NETWORK…</span></div>
+</div></header>
+
+<section class="hero wrap">
+  <h1><span class="ai-c">AI</span> has overtaken <span class="btc-c">Bitcoin</span>.<br>And the gap is widening — live.</h1>
+  <p class="sub">Instantaneous electrical power drawn by the Bitcoin network (measured live from on-chain hashrate) and by global AI (nowcast anchored on IEA trajectories). Two curves, one power grid.</p>
+</section>
+
+<section class="wrap">
+  <div class="gauges">
+    <div class="gauge g-btc">
+      <div class="g-label"><span>⛏ Bitcoin — instantaneous power</span><span class="g-tag">LIVE · ON-CHAIN</span></div>
+      <div class="g-value"><span id="btcGW">—</span> <span class="g-unit">GW</span></div>
+      <div class="g-sub">≈ <span id="btcTWh">—</span> TWh/yr · hashrate <span id="btcHash">—</span> EH/s</div>
+      <div class="g-foot">Hashrate observed on the blockchain (mempool.space) × ASIC fleet efficiency calibrated to the Cambridge CBECI model.</div>
+    </div>
+    <div class="gauge g-ai">
+      <div class="g-label"><span>⚡ Global AI — instantaneous power</span><span class="g-tag">NOWCAST · MODELED</span></div>
+      <div class="g-value"><span id="aiGW">—</span> <span class="g-unit">GW</span></div>
+      <div class="g-sub">≈ <span id="aiTWh">—</span> TWh/yr · range <span id="aiRange">—</span> TWh</div>
+      <div class="g-foot">Accelerated servers (GPU/TPU) + cooling. Daily interpolation between IEA anchor points 2024–2030. No direct measurement exists: this is an estimate, and labeled as such.</div>
+    </div>
+  </div>
+
+  <div class="session">
+    <span class="s-l">Electricity consumed since you opened this page</span>
+    <span class="s-v"><b class="ai-c" style="color:var(--ai)" id="sesAI">0</b> kWh AI&nbsp;&nbsp;·&nbsp;&nbsp;<b style="color:var(--btc)" id="sesBTC">0</b> kWh Bitcoin</span>
+  </div>
+</section>
+
+<section class="wrap">
+  <div class="chart-head">
+    <h2>Annualized consumption, 2020 → 2030 (TWh)</h2>
+    <div class="legend">
+      <span><i class="sw a"></i>AI (accelerated servers)</span>
+      <span><i class="sw b"></i>Bitcoin (CBECI)</span>
+      <span><i class="sw dash"></i>Projection</span>
+    </div>
+  </div>
+  <div class="chart-box"><div id="chart"></div></div>
+  <p class="chart-note">Shaded bands = uncertainty ranges (low/high bounds of published models). Solid line = reconstructed history; dashed = IEA projection (central scenario). Pulsing dot = this page's live reading. Hover the chart for values.</p>
+</section>
+
+<section class="method wrap">
+  <h2>Why these numbers are reliable</h2>
+  <div class="m-grid">
+    <div class="m-card m-b">
+      <h3>Bitcoin — measured, not estimated <span class="conf hi">■ high confidence</span></h3>
+      <p>Bitcoin is the only energy system in the world whose total activity is public down to the second. The hashrate (global computing power) can be read directly from the blockchain via difficulty and block timing.</p>
+      <div class="formula">P (GW) = Hashrate (EH/s) × Fleet efficiency (J/TH) × PUE ÷ 1000</div>
+      <p>This page reads the hashrate live and applies the average fleet efficiency (~16.5 J/TH) and a PUE of 1.10, calibrated to reproduce the central estimate of the Cambridge CBECI — the academic reference cited by the IEA and the White House. Model error margin: roughly ±15%.</p>
+    </div>
+    <div class="m-card m-a">
+      <h3>AI — the best available proxy <span class="conf med">■ medium confidence</span></h3>
+      <p>No hashrate exists for AI: hyperscalers do not publish their consumption in real time. The only honest approach is a nowcast: daily interpolation between solid annual anchor points.</p>
+      <div class="formula">TWh(t) = interpolation( IEA/CBECI anchors 2020→2030 )(t)</div>
+      <p>Anchors: ~110 TWh (2024), ~190 TWh (2025, ≈40% of the 485 TWh consumed by data centers), IEA trajectory toward a tripling by 2030. The uncertainty band (±25%) spans the gap between published models (IEA, SemiAnalysis, de Vries/Digiconomist). This is exactly how central banks handle unobservable data: anchor, bound, display the uncertainty.</p>
+    </div>
+  </div>
+</section>
+
+<section class="sources wrap">
+  <h3>Sources & data</h3>
+  <ul>
+    <li>→ <a href="https://ccaf.io/cbnsi/cbeci" target="_blank" rel="noopener">Cambridge Bitcoin Electricity Consumption Index (CBECI)</a> — reference model, Bitcoin consumption</li>
+    <li>→ <a href="https://mempool.space/graphs/mining/hashrate-difficulty" target="_blank" rel="noopener">mempool.space</a> — real-time on-chain hashrate (public API used by this page)</li>
+    <li>→ <a href="https://www.iea.org/reports/energy-and-ai" target="_blank" rel="noopener">IEA — Energy & AI</a> — data centers 415 TWh (2024) → ~945 TWh (2030), accelerated servers</li>
+    <li>→ <a href="https://digiconomist.net/bitcoin-energy-consumption" target="_blank" rel="noopener">Digiconomist / A. de Vries</a> — upper bounds, Bitcoin & AI</li>
+  </ul>
+  <p class="stamp">Bitcoin: live on-chain data. AI: modeled nowcast, refreshed on each load. Last reading: <span id="stamp">—</span></p>
+</section>
+
+<div class="tooltip" id="tt"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ═══════════ ANCHOR DATA (annualized TWh, mid-year) ═══════════
+   BTC: CBECI history (central) + low/high bounds (CBECI low / Digiconomist)
+   AI : accelerated servers — IEA anchors / converging estimates, ±25% bounds */
+var YEARS = [2020,2021,2022,2023,2024,2025,2026,2027,2028,2029,2030];
+var BTC = { mid:[ 67,  95, 105, 121, 150, 165, 158, 160, 162, 163, 165],
+            lo :[ 55,  75,  88, 100, 130, 140, 138, 130, 125, 118, 110],
+            hi :[ 78, 115, 130, 148, 176, 200, 200, 210, 220, 230, 240] };
+var AI  = { mid:[ 16,  26,  42,  65, 110, 190, 260, 330, 405, 480, 555],
+            lo :[ 12,  20,  32,  50,  85, 145, 200, 250, 305, 360, 420],
+            hi :[ 20,  33,  53,  82, 138, 238, 325, 415, 505, 600, 695] };
+var YEARSM = YEARS.map(function(y){return y+0.5;});
+var NOW = new Date();
+var NOW_X = NOW.getFullYear() + (NOW.getMonth()+0.5)/12;
+
+/* Bitcoin fleet efficiency (J/TH) × PUE, calibrated to CBECI */
+var FLEET_J_PER_TH = 16.5, PUE = 1.10;
+var FALLBACK_EHS = 1020; /* if the API is unreachable */
+
+function interp(xs, ys, x){
+  if(x<=xs[0]) return ys[0];
+  if(x>=xs[xs.length-1]) return ys[ys.length-1];
+  for(var i=0;i<xs.length-1;i++){
+    if(x>=xs[i]&&x<=xs[i+1]){
+      var t=(x-xs[i])/(xs[i+1]-xs[i]);
+      return ys[i]+t*(ys[i+1]-ys[i]);
+    }
+  }
+  return ys[ys.length-1];
+}
+var HOURS_YEAR = 8766;
+function twhToGW(twh){ return twh*1000/HOURS_YEAR; }
+function fmt(n,d){ return n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+
+/* ═══════════ LIVE STATE ═══════════ */
+var state = {
+  btcGW: twhToGW(interp(YEARSM,BTC.mid,NOW_X)),
+  aiGW:  twhToGW(interp(YEARSM,AI.mid,NOW_X)),
+  aiTWh: interp(YEARSM,AI.mid,NOW_X),
+  aiLo:  interp(YEARSM,AI.lo,NOW_X),
+  aiHi:  interp(YEARSM,AI.hi,NOW_X),
+  ehs:   FALLBACK_EHS,
+  live:  false
+};
+
+function applyHashrate(ehs){
+  state.ehs = ehs;
+  state.btcGW = ehs * FLEET_J_PER_TH * PUE / 1000; /* EH/s × J/TH → GW */
+  render();
+}
+
+/* Live hashrate (3-day average, smooths block noise) */
+fetch('https://mempool.space/api/v1/mining/hashrate/3d')
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    var hs = d.currentHashrate || (d.hashrates && d.hashrates.length ? d.hashrates[d.hashrates.length-1].avgHashrate : null);
+    if(hs){ state.live = true; applyHashrate(hs/1e18); }
+    document.getElementById('liveStatus').textContent = state.live ? 'BITCOIN LIVE · AI NOWCAST' : 'OFFLINE MODE · LAST KNOWN DATA';
+  })
+  .catch(function(){
+    document.getElementById('liveStatus').textContent = 'OFFLINE MODE · LAST KNOWN DATA';
+    render();
+  });
+
+/* ═══════════ GAUGES + SESSION COUNTER ═══════════ */
+var t0 = Date.now();
+function render(){
+  var btcTWh = state.btcGW*HOURS_YEAR/1000;
+  document.getElementById('btcGW').textContent  = fmt(state.btcGW,1);
+  document.getElementById('btcTWh').textContent = fmt(btcTWh,0);
+  document.getElementById('btcHash').textContent= fmt(state.ehs,0);
+  document.getElementById('aiGW').textContent   = fmt(state.aiGW,1);
+  document.getElementById('aiTWh').textContent  = fmt(state.aiTWh,0);
+  document.getElementById('aiRange').textContent= fmt(state.aiLo,0)+'–'+fmt(state.aiHi,0);
+  document.getElementById('stamp').textContent  = NOW.toLocaleString('en-US');
+}
+setInterval(function(){
+  var s=(Date.now()-t0)/1000;
+  /* GW × s = GJ ; ÷3.6 = MWh ×1000 = kWh → GW×s×1000/3.6 */
+  document.getElementById('sesAI').textContent  = fmt(state.aiGW *s*1000/3.6,0);
+  document.getElementById('sesBTC').textContent = fmt(state.btcGW*s*1000/3.6,0);
+},250);
+render();
+
+/* ═══════════ OVERLAID SVG CHART ═══════════ */
+var W=1000,H=440,ML=58,MR=24,MT=18,MB=40;
+var X0=2020.5,X1=2030.5,Y0=0,Y1=720;
+function sx(x){ return ML+(x-X0)/(X1-X0)*(W-ML-MR); }
+function sy(y){ return H-MB-(y-Y0)/(Y1-Y0)*(H-MT-MB); }
+
+function pathAt(xs,ys,from,to,step){
+  var d='',x;
+  for(x=from;x<=to+1e-9;x+=step){
+    d+=(d?' L':'M')+sx(x).toFixed(1)+' '+sy(interp(xs,ys,x)).toFixed(1);
+  }
+  return d;
+}
+function bandPath(xs,lo,hi,from,to,step){
+  var top='',x;
+  for(x=from;x<=to+1e-9;x+=step) top+=(top?' L':'M')+sx(x).toFixed(1)+' '+sy(interp(xs,hi,x)).toFixed(1);
+  var bot='';
+  for(x=to;x>=from-1e-9;x-=step) bot+=' L'+sx(x).toFixed(1)+' '+sy(interp(xs,lo,x)).toFixed(1);
+  return top+bot+' Z';
+}
+
+var s='';
+s+='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Overlaid chart: AI vs Bitcoin electricity consumption 2020-2030">';
+/* horizontal grid */
+for(var gy=0; gy<=700; gy+=100){
+  s+='<line x1="'+ML+'" y1="'+sy(gy)+'" x2="'+(W-MR)+'" y2="'+sy(gy)+'" stroke="#1B2436" stroke-width="1"/>';
+  s+='<text x="'+(ML-10)+'" y="'+(sy(gy)+4)+'" fill="#5A6478" font-size="11" text-anchor="end">'+gy+'</text>';
+}
+/* years */
+for(var yr=2021; yr<=2030; yr++){
+  s+='<text x="'+sx(yr)+'" y="'+(H-14)+'" fill="#5A6478" font-size="11" text-anchor="middle">'+yr+'</text>';
+}
+/* uncertainty bands */
+s+='<path d="'+bandPath(YEARS,AI.lo,AI.hi,X0,X1,0.1)+'" fill="rgba(77,163,255,.10)"/>';
+s+='<path d="'+bandPath(YEARS,BTC.lo,BTC.hi,X0,X1,0.1)+'" fill="rgba(247,147,26,.10)"/>';
+/* "now" line */
+s+='<line x1="'+sx(NOW_X)+'" y1="'+MT+'" x2="'+sx(NOW_X)+'" y2="'+(H-MB)+'" stroke="#3DDC84" stroke-width="1" stroke-dasharray="3 4" opacity=".55"/>';
+s+='<text x="'+(sx(NOW_X)+6)+'" y="'+(MT+12)+'" fill="#3DDC84" font-size="10" letter-spacing="1">TODAY</text>';
+/* curves: solid until now, dashed after */
+s+='<path d="'+pathAt(YEARS,AI.mid,X0,NOW_X,0.05)+'" fill="none" stroke="#4DA3FF" stroke-width="3" stroke-linecap="round"/>';
+s+='<path d="'+pathAt(YEARS,AI.mid,NOW_X,X1,0.05)+'" fill="none" stroke="#4DA3FF" stroke-width="2.5" stroke-dasharray="6 7" opacity=".85"/>';
+s+='<path d="'+pathAt(YEARS,BTC.mid,X0,NOW_X,0.05)+'" fill="none" stroke="#F7931A" stroke-width="3" stroke-linecap="round"/>';
+s+='<path d="'+pathAt(YEARS,BTC.mid,NOW_X,X1,0.05)+'" fill="none" stroke="#F7931A" stroke-width="2.5" stroke-dasharray="6 7" opacity=".85"/>';
+/* crossover (solved numerically) */
+var xc=null, px=2020, pd=interp(YEARSM,AI.mid,px)-interp(YEARSM,BTC.mid,px);
+for(var xx=2020.05; xx<=2030; xx+=0.05){
+  var dd=interp(YEARSM,AI.mid,xx)-interp(YEARSM,BTC.mid,xx);
+  if(pd<0&&dd>=0){ xc=xx; break; } pd=dd;
+}
+if(xc){
+  var yc=interp(YEARSM,AI.mid,xc);
+  s+='<circle cx="'+sx(xc)+'" cy="'+sy(yc)+'" r="6" fill="none" stroke="#E8EDF7" stroke-width="1.5"/>';
+  s+='<text x="'+sx(xc)+'" y="'+(sy(yc)-14)+'" fill="#E8EDF7" font-size="11" text-anchor="middle">Crossover \u2248 '+Math.floor(xc)+'</text>';
+}
+/* live dots */
+s+='<circle cx="'+sx(NOW_X)+'" cy="'+sy(interp(YEARSM,AI.mid,NOW_X))+'" r="5" fill="#4DA3FF"><animate attributeName="r" values="4;7;4" dur="1.8s" repeatCount="indefinite"/></circle>';
+s+='<circle cx="'+sx(NOW_X)+'" cy="'+sy(interp(YEARSM,BTC.mid,NOW_X))+'" r="5" fill="#F7931A"><animate attributeName="r" values="4;7;4" dur="1.8s" repeatCount="indefinite"/></circle>';
+/* Y axis label */
+s+='<text x="16" y="'+(H/2)+'" fill="#8B96AD" font-size="11" transform="rotate(-90 16 '+(H/2)+')" text-anchor="middle">TWh / yr</text>';
+/* hover zone */
+s+='<rect id="hover" x="'+ML+'" y="'+MT+'" width="'+(W-ML-MR)+'" height="'+(H-MT-MB)+'" fill="transparent"/>';
+s+='<line id="cursor" x1="0" y1="'+MT+'" x2="0" y2="'+(H-MB)+'" stroke="#8B96AD" stroke-width="1" opacity="0"/>';
+s+='</svg>';
+document.getElementById('chart').innerHTML=s;
+
+/* Tooltip */
+var svg=document.querySelector('#chart svg'), tt=document.getElementById('tt'), cur=document.getElementById('cursor');
+var hov=document.getElementById('hover');
+function onMove(e){
+  var pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY;
+  var p=pt.matrixTransform(svg.getScreenCTM().inverse());
+  var x=X0+(p.x-ML)/(W-ML-MR)*(X1-X0);
+  if(x<X0||x>X1){ tt.style.display='none'; cur.setAttribute('opacity','0'); return; }
+  var a=interp(YEARSM,AI.mid,x), b=interp(YEARSM,BTC.mid,x);
+  cur.setAttribute('x1',sx(x)); cur.setAttribute('x2',sx(x)); cur.setAttribute('opacity','.4');
+  tt.innerHTML='<div class="t-y">'+(x<NOW_X?'':'projection · ')+x.toFixed(1)+'</div>'
+    +'<div class="t-a">AI&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'+fmt(a,0)+' TWh/yr</div>'
+    +'<div class="t-b">Bitcoin '+fmt(b,0)+' TWh/yr</div>'
+    +'<div style="color:#8B96AD;margin-top:4px">ratio ×'+fmt(a/b,2)+'</div>';
+  tt.style.display='block';
+  tt.style.left=Math.min(e.clientX+16,window.innerWidth-190)+'px';
+  tt.style.top=(e.clientY+16)+'px';
+}
+hov.addEventListener('mousemove',onMove);
+hov.addEventListener('mouseleave',function(){ tt.style.display='none'; cur.setAttribute('opacity','0'); });
+hov.addEventListener('touchmove',function(e){ onMove(e.touches[0]); e.preventDefault(); },{passive:false});
+})();
+</script>
+</body>
+</html>
